@@ -87,6 +87,13 @@ int serverPrintInterval = 0;
 #define QueryCommand 't' // Used for Querying Time
 #define QuitCommand 'q'
 
+void *callTimeFunction(){
+    for(int i = 0 ; i<2 ; ++i){
+        printTime();
+        sleep(2);
+    }
+}
+
 /*---------------------------------------------------------------
 Function: main
 
@@ -104,8 +111,6 @@ int main(int argc, char *argv[])
 
     char readFDRouter[5];
     char writeFDRouter[5];
-    char readFDRouter2[5];
-    char writeFDRouter2[5];
     char readFromServer[5];
     char writeToServer[5];
 
@@ -149,21 +154,12 @@ int main(int argc, char *argv[])
     sprintf(readFromServer, "%d", pipeServer2Routerfd[0]);
     sprintf(writeToServer, "%d", pipeRouter2Serverfd[1]);
 
-    
-    
-    //wait();
-
     routerArgs[0] = "router" ;
     routerArgs[1] = readFDRouter;
     routerArgs[2] = writeFDRouter;
     routerArgs[3] = readFromServer;
     routerArgs[4] = writeToServer;
     routerArgs[5] = NULL;
-    //bool test;
-    //test = false;
-
-
-    //wait();
 
     routerpid = fork();
     if(routerpid == -1){
@@ -172,18 +168,7 @@ int main(int argc, char *argv[])
     }
     else if(routerpid == 0){   /* child (start router) */
         //Start router process. May need to connect pipe here also.
-        /*
-        if(dup2(pipeUser2Routerfd[0], 0) == -1){
-            perror("dup2: ");
-            exit(-1);
-        }
-        if(dup2(pipeRouter2Userfd[1], 1) == -1){
-            perror("dup2: ");
-            exit(-1);
-        }
-        */
-        //close(pipeUser2Routerfd[1]);
-        close(pipeUser2Routerfd[0]);
+        close(pipeUser2Routerfd[1]);
         //close(pipeRouter2Userfd[1]);
         //close(pipeRouter2Userfd[0]);
 
@@ -192,25 +177,16 @@ int main(int argc, char *argv[])
         exit(-1); /* In case router fails */
     }
 
-    /*
-    if(dup2(pipeUser2Routerfd[1], 1) == -1){
-        perror("dup2: ");
-        exit(-1);
-    }
-    if(dup2(pipeRouter2Userfd[0], 0) == -1){
-        perror("dup2: ");
-        exit(-1);
-    }
-    */
+    
     close(pipeUser2Routerfd[0]);
     //close(pipeUser2Routerfd[1]);
     //close(pipeRouter2Userfd[1]);
     //close(pipeRouter2Userfd[0]);
 
     printf("Sending msg from user: hello\n");
-    write(pipeUser2Routerfd[1], "hello", strlen("test")+1);
+    write(pipeUser2Routerfd[1], "hello", strlen("hello")+1);
 
-
+    //wait();
     //read(pipeRouter2Userfd[0], messageFromRouter, 10);
     //printf("(User) Message from router: %s\n", messageFromRouter);
     //close(pipeRouter2Userfd[0]);
@@ -222,6 +198,7 @@ int main(int argc, char *argv[])
     }
     else if(serverpid == 0){
         char routerMsg[10];
+        char response[] = "heyfromserver";
         close(pipeRouter2Serverfd[1]);
         printf("About to start process: server\n");
         /*
@@ -231,13 +208,18 @@ int main(int argc, char *argv[])
             }
         }
         */
+
+        pthread_t timeThread;
+        pthread_create(&timeThread, NULL, callTimeFunction(), NULL);
+
         read(pipeRouter2Serverfd[0], routerMsg, 10);
         printf("(Server) message from router: %s\n", routerMsg); 
+        write(pipeServer2Routerfd[1], response, 12);
         close(pipeRouter2Serverfd[0]);
         close(pipeServer2Routerfd[1]);
     }
 
-    sleep(8);
+    //sleep(8);
 
     //Start server process
     

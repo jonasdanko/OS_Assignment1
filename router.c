@@ -32,6 +32,8 @@ int main(int argc, char *argv[])
     int fdReadServer, fdWriteServer;
     char Router2Userfd[100];
     char test_string[10];
+    char time_command[1];
+    char server_response[12];
 
     
     if(argc != 5)
@@ -55,8 +57,11 @@ int main(int argc, char *argv[])
 
     //sleep(2);
 
-    close(fdReadServer);
+    //close(fdReadServer);
     write(fdWriteServer, test_string, 10);
+    sleep(2);
+    read(fdReadServer, server_response, 10);
+    printf("Response from server: %s\n", server_response);
     close(fdWriteServer);
 
     return 0;

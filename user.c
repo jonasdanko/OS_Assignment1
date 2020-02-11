@@ -87,8 +87,10 @@ int serverPrintInterval = 0;
 #define QueryCommand 't' // Used for Querying Time
 #define QuitCommand 'q'
 
+
 void *callTimeFunction(){
     for(int i = 0 ; i<2 ; ++i){
+        //sleep(2);
         printTime();
         sleep(2);
     }
@@ -122,10 +124,9 @@ int main(int argc, char *argv[])
     char *routerArgs[6];
 
     char messageFromRouter[10];
+    char timeFromServer[14];
+    char serverTime[12];
     
-
-
-    //printf("Everything is working fine");
     
     // Create pipes
 	if(pipe(pipeUser2Routerfd) == -1){
@@ -169,28 +170,16 @@ int main(int argc, char *argv[])
     else if(routerpid == 0){   /* child (start router) */
         //Start router process. May need to connect pipe here also.
         close(pipeUser2Routerfd[1]);
-        //close(pipeRouter2Userfd[1]);
-        //close(pipeRouter2Userfd[0]);
+        close(pipeRouter2Userfd[0]);
 
-        printf("about to start process: router\n");
+        printf("Router PID: %d\n", getpid());
         execv("router", routerArgs);
         exit(-1); /* In case router fails */
     }
 
-    
+    printf("User PID: %d\n", getpid());
     close(pipeUser2Routerfd[0]);
-    //close(pipeUser2Routerfd[1]);
-    //close(pipeRouter2Userfd[1]);
-    //close(pipeRouter2Userfd[0]);
-
-    printf("Sending msg from user: hello\n");
-    write(pipeUser2Routerfd[1], "hello", strlen("hello")+1);
-
-    //wait();
-    //read(pipeRouter2Userfd[0], messageFromRouter, 10);
-    //printf("(User) Message from router: %s\n", messageFromRouter);
-    //close(pipeRouter2Userfd[0]);
-
+    close(pipeRouter2Userfd[1]);
 
     serverpid = fork();
     if(serverpid == -1){
@@ -198,58 +187,83 @@ int main(int argc, char *argv[])
     }
     else if(serverpid == 0){
         char routerMsg[10];
-        char response[] = "heyfromserver";
         close(pipeRouter2Serverfd[1]);
-        printf("About to start process: server\n");
-        /*
-        for(int t=0 ;t<100; ++t){
-            if(read(pipeRouter2Serverfd[0], routerMsg, 10)>0){
-                break;
-            }
-        }
-        */
+        close(pipeServer2Routerfd[0]);
+        printf("Server PID: %d\n", getpid());
 
-        pthread_t timeThread;
-        pthread_create(&timeThread, NULL, callTimeFunction(), NULL);
+        //pthread_t timeThread;
+        //pthread_create(&timeThread, NULL, callTimeFunction(), NULL);
+        //pthread_exit(&timeThread);
+
+        /*    Round 1    */
 
         read(pipeRouter2Serverfd[0], routerMsg, 10);
-        printf("(Server) message from router: %s\n", routerMsg); 
-        write(pipeServer2Routerfd[1], response, 12);
+        TimeInfo timeInfo = getTimeInfo();
+        sprintf(serverTime, "%d:%d:%d", timeInfo.hour, timeInfo.minute, timeInfo.second);
+        write(pipeServer2Routerfd[1], serverTime, sizeof(serverTime));
+
+        /*   Round 2    */
+
+        read(pipeRouter2Serverfd[0], routerMsg, 10);
+        TimeInfo timeInfo2 = getTimeInfo();
+        sprintf(serverTime, "%d:%d:%d", timeInfo2.hour, timeInfo2.minute, timeInfo2.second);
+        write(pipeServer2Routerfd[1], serverTime, sizeof(serverTime));
+
+        /*    Time to quit   */
+
+        read(pipeRouter2Serverfd[0], routerMsg, 10);
+        printf("%s command recieved. Server has quit.\n", routerMsg);
+
+        kill(getpid(), SIGKILL);
+
+        //sleep(4);
         close(pipeRouter2Serverfd[0]);
         close(pipeServer2Routerfd[1]);
+        
     }
 
-    //sleep(8);
 
-    //Start server process
-    
-    // Create Server process
-    // 1. Server process should create a thread to display current time for at least 2 times
-    // 2. Server should respond the following command from Router
-    //     -"t": send current time to the router
-    //     -"q": stop waiting for the command, kill thread and exit.
-    // 3. Server should end the process by itself instead of User process
-    
-    // Create User process
-    // 4. User queries time for at least 2 times by sending 't' command to Router
-    // 5. Then User sends 'q' command to Router
-    // 6. User waits for the Server ending itself
-    // 7. User kills the Router process
-    
 
-    //Create server process
-    /*
-    serverpid = fork();
-    if(serverpid == -1){
-        printf("Second fork failed (server process).");
-        exit(-1);
-    }else if(serverpid == 0){
-        execlp();
-
-        printf();
-    }
+    /*  
+        Here is the User functionality.
+        User sends "t" command to Router then reads the response from the Server through Router
+        User then prints the time sent from Server
+        User does this process twice.
+        Then User sends "q" command to Router then waits for
+        routers response saying Server quit.
+        User then kills the Router process.
     */
+
+    /*   Round 1   */
+
+    write(pipeUser2Routerfd[1], "t", strlen("t")+1);
+    //wait(NULL);
+    //sleep(2);
+    read(pipeRouter2Userfd[0], timeFromServer, 14);
+    printf("%d@%s\n", getpid(), timeFromServer);
+
+    /*    Round 2   */
+
+    write(pipeUser2Routerfd[1], "t", strlen("t")+1);
+    //wait(NULL);
+    //sleep(2);
+    read(pipeRouter2Userfd[0], timeFromServer, 14);
+    printf("%d@%s\n", getpid(), timeFromServer);
+
+   
+    /*     Time to quit    */
+
+    write(pipeUser2Routerfd[1], "q", strlen("q")+1);
+    wait(NULL);
+    //sleep(2);
+    char routerPID[12];
+    read(pipeRouter2Userfd[0], routerPID, 12);
+    int killRouter = atoi(routerPID);
+    printf("Router has been killed\n");
+    kill(killRouter, SIGKILL);
     
+
+    sleep(5);
     
     return 0;
 }

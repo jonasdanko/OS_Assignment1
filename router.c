@@ -34,6 +34,7 @@ int main(int argc, char *argv[])
     char test_string[10];
     char time_command[1];
     char server_response[12];
+    char time[3];
 
     
     if(argc != 5)
@@ -47,22 +48,44 @@ int main(int argc, char *argv[])
     fdReadServer = atoi(argv[3]);
     fdWriteServer = atoi(argv[4]);
 
+
+    /*   Round 1    */
+
     read(fdReadUser, test_string, 10);
-    close(fdReadUser);
-    //printf("Working\n");
-    printf("(router) Message from user: %s\n", test_string);
-    //printf("%s\n", test_string);
-    //write(fdWriteUser, test_string, 10);
-    close(fdWriteUser);
-
-    //sleep(2);
-
-    //close(fdReadServer);
-    write(fdWriteServer, test_string, 10);
+    printf("%d@User has sent %d bytes to Server\n", getpid(), sizeof("t"));
     sleep(2);
-    read(fdReadServer, server_response, 10);
-    printf("Response from server: %s\n", server_response);
+    write(fdWriteServer, test_string, 10);
+    read(fdReadServer, server_response, 12);
+    printf("%d@Server has sent %d bytes to User\n", getpid(), sizeof("time"));
+    write(fdWriteUser, server_response, 12);
+
+    /*   Round 2   */
+
+    read(fdReadUser, test_string, 10);
+    printf("%d@User has sent %d bytes to Server\n", getpid(), sizeof("t"));
+    sleep(2);
+    write(fdWriteServer, test_string, 10);
+    read(fdReadServer, server_response, 12);
+    printf("%d@Server has sent %d bytes to User\n", getpid(), sizeof("time"));
+    write(fdWriteUser, server_response, 12);
+
+    /*     Time to quit     */
+
+    read(fdReadUser, test_string, 10);
+    printf("%d@User has sent %d bytes to Server\n", getpid(), sizeof("q"));
+    sleep(2);
+    write(fdWriteServer, test_string, 10);
+    char routerPID[12];
+    sprintf(routerPID, "%d", getpid());
+    write(fdWriteUser, routerPID, sizeof(routerPID));
+
+    
     close(fdWriteServer);
+    close(fdWriteUser);
+    close(fdReadServer);
+    close(fdReadUser);
+
+    sleep(30);
 
     return 0;
 }
